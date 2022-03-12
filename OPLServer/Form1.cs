@@ -1,10 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
 using System.Windows.Forms;
 
 using SMBLibrary;
@@ -15,9 +10,6 @@ using SMBLibrary.Win32;
 using System.IO;
 using SMBLibrary.Authentication.GSSAPI;
 using Utilities;
-using System.Diagnostics;
-using SMBLibrary.Win32.Security;
-using System.Configuration;
 
 namespace OPLServer
 {
@@ -29,6 +21,7 @@ namespace OPLServer
         private NTLMAuthenticationProviderBase authenticationMechanism;
         private LogWriter m_logWriter;
         private UserCollection users = new UserCollection();
+        private GlobalSettings settings = GlobalSettings.Instance;
         private string AppPath = AppDomain.CurrentDomain.BaseDirectory;
         public delegate void addLog(string a, string b, string c, string d);
         public bool isLoadingSettings = false;
@@ -87,16 +80,16 @@ namespace OPLServer
         void loadSettings()
         {
             isLoadingSettings = true;
-            if (getSetting("ServerPort") != "") tstbPort.Text = getSetting("ServerPort");
-            if (getSetting("EnableLog") == "1") { tsbEnableLog.Checked = true; } else { tsbEnableLog.Checked = false; }
-            if (getSetting("AutoScroll") == "1") { tsbAutoScroll.Checked = true; } else { tsbAutoScroll.Checked = false; }
-            if (getSetting("LogCritical") == "1") { tsbLogCritical.Checked = true; } else { tsbLogCritical.Checked = false; }
-            if (getSetting("LogDebug") == "1") { tsbLogDebug.Checked = true; } else { tsbLogDebug.Checked = false; }
-            if (getSetting("LogError") == "1") { tsbLogError.Checked = true; } else { tsbLogError.Checked = false; }
-            if (getSetting("LogInfo") == "1") { tsbLogInfo.Checked = true; } else { tsbLogInfo.Checked = false; }
-            if (getSetting("LogTrace") == "1") { tsbLogTrace.Checked = true; } else { tsbLogTrace.Checked = false; }
-            if (getSetting("LogVerbose") == "1") { tsbLogVerbose.Checked = true; } else { tsbLogVerbose.Checked = false; }
-            if (getSetting("LogWarn") == "1") { tsbLogWarn.Checked = true; } else { tsbLogWarn.Checked = false; }
+            if (settings.getSetting("ServerPort") != "") tstbPort.Text = settings.getSetting("ServerPort");
+            if (settings.getSetting("EnableLog") == "1") { tsbEnableLog.Checked = true; } else { tsbEnableLog.Checked = false; }
+            if (settings.getSetting("AutoScroll") == "1") { tsbAutoScroll.Checked = true; } else { tsbAutoScroll.Checked = false; }
+            if (settings.getSetting("LogCritical") == "1") { tsbLogCritical.Checked = true; } else { tsbLogCritical.Checked = false; }
+            if (settings.getSetting("LogDebug") == "1") { tsbLogDebug.Checked = true; } else { tsbLogDebug.Checked = false; }
+            if (settings.getSetting("LogError") == "1") { tsbLogError.Checked = true; } else { tsbLogError.Checked = false; }
+            if (settings.getSetting("LogInfo") == "1") { tsbLogInfo.Checked = true; } else { tsbLogInfo.Checked = false; }
+            if (settings.getSetting("LogTrace") == "1") { tsbLogTrace.Checked = true; } else { tsbLogTrace.Checked = false; }
+            if (settings.getSetting("LogVerbose") == "1") { tsbLogVerbose.Checked = true; } else { tsbLogVerbose.Checked = false; }
+            if (settings.getSetting("LogWarn") == "1") { tsbLogWarn.Checked = true; } else { tsbLogWarn.Checked = false; }
             isLoadingSettings = false;
         }
 
@@ -104,16 +97,16 @@ namespace OPLServer
         {
             if (isLoadingSettings) return;
 
-            setSetting("ServerPort", tstbPort.Text);
-            setSetting("EnableLog", tsbEnableLog.Checked ? "1" : "0");
-            setSetting("AutoScroll", tsbAutoScroll.Checked  ? "1" : "0");
-            setSetting("LogCritical", tsbLogCritical.Checked  ? "1" : "0");
-            setSetting("LogDebug", tsbLogDebug.Checked  ? "1" : "0");
-            setSetting("LogError", tsbLogError.Checked  ? "1" : "0");
-            setSetting("LogInfo", tsbLogInfo.Checked  ? "1" : "0");
-            setSetting("LogTrace", tsbLogTrace.Checked  ? "1" : "0");
-            setSetting("LogVerbose", tsbLogVerbose.Checked  ? "1" : "0");
-            setSetting("LogWarn", tsbLogWarn.Checked ? "1" : "0");
+            settings.setSetting("ServerPort", tstbPort.Text);
+            settings.setSetting("EnableLog", tsbEnableLog.Checked ? "1" : "0");
+            settings.setSetting("AutoScroll", tsbAutoScroll.Checked  ? "1" : "0");
+            settings.setSetting("LogCritical", tsbLogCritical.Checked  ? "1" : "0");
+            settings.setSetting("LogDebug", tsbLogDebug.Checked  ? "1" : "0");
+            settings.setSetting("LogError", tsbLogError.Checked  ? "1" : "0");
+            settings.setSetting("LogInfo", tsbLogInfo.Checked  ? "1" : "0");
+            settings.setSetting("LogTrace", tsbLogTrace.Checked  ? "1" : "0");
+            settings.setSetting("LogVerbose", tsbLogVerbose.Checked  ? "1" : "0");
+            settings.setSetting("LogWarn", tsbLogWarn.Checked ? "1" : "0");
         }
 
         void setServerPort(int servPort)
@@ -306,38 +299,6 @@ namespace OPLServer
                 tstbPort.Text = "1024";
                 tstbPort.Focus();
             }
-        }
-
-        private string getSetting(string key)
-        {
-            try
-            {
-                var appSettings = ConfigurationManager.AppSettings;
-                string result = appSettings[key] ?? "";
-                return result;
-            }
-            catch (ConfigurationErrorsException){}
-            return "";
-        }
-
-        private void setSetting(string key, string value)
-        {
-            try
-            {
-                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-                var settings = configFile.AppSettings.Settings;
-                if (settings[key] == null)
-                {
-                    settings.Add(key, value);
-                }
-                else
-                {
-                    settings[key].Value = value;
-                }
-                configFile.Save(ConfigurationSaveMode.Modified);
-                ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
-            }
-            catch (ConfigurationErrorsException){}
         }
 
         private void tsbSettingChanged_CheckedChanged(object sender, EventArgs e)

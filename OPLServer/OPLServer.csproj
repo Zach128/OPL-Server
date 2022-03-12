@@ -83,6 +83,7 @@
     <Compile Include="LogWriter.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="GlobalSettings.cs" />
     <Compile Include="ShareSettings.cs" />
     <Compile Include="UserCollection.cs" />
     <EmbeddedResource Include="Form1.resx">
