@@ -15,48 +15,23 @@ namespace OPLServer
 {
     public partial class Form1 : Form
     {
-        private SMBServer m_server;
-        private IPAddress serverAddress = IPAddress.Any;
-        private SMBTransportType transportType = SMBTransportType.DirectTCPTransport;
-        private NTLMAuthenticationProviderBase authenticationMechanism;
         private LogWriter m_logWriter;
-        private UserCollection users = new UserCollection();
         private GlobalSettings settings = GlobalSettings.Instance;
-        private string AppPath = AppDomain.CurrentDomain.BaseDirectory;
+        private SMBManager smbManager;
         public delegate void addLog(string a, string b, string c, string d);
         public bool isLoadingSettings = false;
 
         public Form1()
         {
             InitializeComponent();
-
-            if (!Directory.Exists(AppPath + "PS2"))
-            {
-                Directory.CreateDirectory(AppPath + "PS2");
-            }
-
-            users.Add("Guest", "");
-            users.Add("Guest", "Guest");
-            authenticationMechanism = new IndependentNTLMAuthenticationProvider(users.GetUserPassword);
-
-            List<ShareSettings> sharesSettings = new List<ShareSettings>();
-            ShareSettings itemtoshare = new ShareSettings("PS2", AppPath + "PS2", new List<string>() { "Guest" }, new List<string>() { "Guest" });
-            sharesSettings.Add(itemtoshare);
-
-            SMBShareCollection shares = new SMBShareCollection();
-            foreach (ShareSettings shareSettings in sharesSettings)
-            {
-                FileSystemShare share = InitializeShare(shareSettings);
-                shares.Add(share);
-            }
-
-            GSSProvider securityProvider = new GSSProvider(authenticationMechanism);
-            m_server = new SMBLibrary.Server.SMBServer(shares, securityProvider);
-
             loadSettings();
 
+            smbManager = new SMBManager();
+
             m_logWriter = new LogWriter();
-            if (tsbEnableLog.Checked) m_server.LogEntryAdded += m_server_LogEntryAdded;
+
+            // If logging is enabled, register the logging method with the SMBServer.
+            if (tsbEnableLog.Checked) smbManager.AddLogHandler(m_server_LogEntryAdded);
 
             string[] args = Environment.GetCommandLineArgs();
 
@@ -109,14 +84,6 @@ namespace OPLServer
             settings.setSetting("LogWarn", tsbLogWarn.Checked ? "1" : "0");
         }
 
-        void setServerPort(int servPort)
-        {
-            // Use reflection to set the ports of the client and server. Would be preferrable to change this to something less hacky.
-            typeof(SMBLibrary.Client.SMB1Client).GetField("DirectTCPPort").SetValue(null, servPort);
-            typeof(SMBLibrary.Client.SMB2Client).GetField("DirectTCPPort").SetValue(null, servPort);
-            typeof(SMBServer).GetField("DirectTCPPort").SetValue(null, servPort);
-        }
-
         void m_server_LogEntryAdded(object sender, LogEntry e)
         {
             if (e.Severity == Severity.Critical && tsbLogCritical.Checked == false) return;
@@ -149,50 +116,6 @@ namespace OPLServer
             }
         }
 
-        public static FileSystemShare InitializeShare(ShareSettings shareSettings)
-        {
-            string shareName = shareSettings.ShareName;
-            string sharePath = shareSettings.SharePath;
-            List<string> readAccess = shareSettings.ReadAccess;
-            List<string> writeAccess = shareSettings.WriteAccess;
-            FileSystemShare share = new FileSystemShare(shareName, new NTDirectoryFileSystem(sharePath));
-            share.AccessRequested += delegate(object sender, AccessRequestArgs args)
-            {
-                bool hasReadAccess = Contains(readAccess, "Users") || Contains(readAccess, args.UserName);
-                bool hasWriteAccess = Contains(writeAccess, "Users") || Contains(writeAccess, args.UserName);
-                if (args.RequestedAccess == FileAccess.Read)
-                {
-                    args.Allow = hasReadAccess;
-                }
-                else if (args.RequestedAccess == FileAccess.Write)
-                {
-                    args.Allow = hasWriteAccess;
-                }
-                else // FileAccess.ReadWrite
-                {
-                    args.Allow = hasReadAccess && hasWriteAccess;
-                }
-            };
-            return share;
-        }
-
-        public static bool Contains(List<string> list, string value)
-        {
-            return (IndexOf(list, value) >= 0);
-        }
-
-        public static int IndexOf(List<string> list, string value)
-        {
-            for (int index = 0; index < list.Count; index++)
-            {
-                if (string.Equals(list[index], value, StringComparison.OrdinalIgnoreCase))
-                {
-                    return index;
-                }
-            }
-            return -1;
-        }
-
         private void Form1_Load(object sender, EventArgs e)
         {
             Form1_Resize(sender, e);
@@ -200,7 +123,7 @@ namespace OPLServer
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            m_server.Stop();
+            smbManager.StopServer();
             m_logWriter.CloseLogFile();
         }
 
@@ -220,7 +143,7 @@ namespace OPLServer
             {
                 try
                 {
-                    m_server.Start(serverAddress, transportType, true, false);
+                    smbManager.StartServer();
                 }
                 catch (Exception ex)
                 {
@@ -239,7 +162,7 @@ namespace OPLServer
             }
             else
             {
-                m_server.Stop();
+                smbManager.StopServer();
                 m_logWriter.CloseLogFile();
                 tsbServerState.Image = Properties.Resources.start;
                 tsbServerState.Text = "Server is stopped (press to start)";
@@ -252,12 +175,12 @@ namespace OPLServer
         {
             if (tsbEnableLog.Checked)
             {
-                m_server.LogEntryAdded += m_server_LogEntryAdded;
+                smbManager.AddLogHandler(m_server_LogEntryAdded);
                 listView1.Enabled = true;
             }
             else
             {
-                m_server.LogEntryAdded -= m_server_LogEntryAdded;
+                smbManager.RemoveLogHandler(m_server_LogEntryAdded);
                 listView1.Enabled = false;
             }
             saveSettings();
@@ -282,7 +205,7 @@ namespace OPLServer
             {
                 if (finalport > 0 && finalport < 1025)
                 {
-                    setServerPort(finalport);
+                    smbManager.setServerPort(finalport);
                     tstbPort.Text = finalport.ToString();
                     saveSettings();
                 }
